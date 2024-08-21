@@ -1,0 +1,68 @@
+#include <iostream>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <cstring>
+
+int main() {
+    int sock = 0;
+    struct sockaddr_in serv_addr;
+    char buffer[1024] = {0};
+
+    // Создание сокета
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        std::cerr << "Socket creation error\n";
+        return EXIT_FAILURE;
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(8080);
+
+    // Преобразование адреса из текстовой формы в бинарную
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+        std::cerr << "Invalid address/ Address not supported\n";
+        return EXIT_FAILURE;
+    }
+
+    // Подключение к серверу
+    if (connect(sock, reinterpret_cast<struct sockaddr*>(&serv_addr), sizeof(serv_addr)) < 0) {
+        std::cerr << "Connection Failed\n";
+        return EXIT_FAILURE;
+    }
+
+    std::string message;
+    while (true) {
+        std::cout << "Enter message (type 'exit' to close): ";
+        std::getline(std::cin, message);
+
+        if (message == "exit") {
+            break;
+        }
+
+        // Отправка сообщения на сервер
+        if (send(sock, message.c_str(), message.length(), 0) == -1) {
+            std::cerr << "Send failed\n";
+            break;
+        }
+
+        // Получение ответа от сервера
+        int valread = read(sock, buffer, sizeof(buffer) - 1);
+        if (valread > 0) {
+            buffer[valread] = '\0';  // Завершение строки
+            std::cout << "Server: " << buffer << std::endl;
+        } else if (valread == 0) {
+            std::cout << "Server disconnected\n";
+            break;
+        } else {
+            std::cerr << "Read failed\n";
+            break;
+        }
+
+        // Очистка буфера
+        std::memset(buffer, 0, sizeof(buffer));
+    }
+
+    // Закрытие сокета
+    close(sock);
+    return 0;
+}
